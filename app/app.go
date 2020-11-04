@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Bios-Marcel/cordless/tview"
+	"github.com/Bios-Marcel/cordless/version"
 	"github.com/Bios-Marcel/cordless/windowman"
 	"github.com/Bios-Marcel/discordgo"
 
@@ -16,12 +17,13 @@ import (
 	"github.com/Bios-Marcel/cordless/shortcuts"
 	"github.com/Bios-Marcel/cordless/ui"
 	"github.com/Bios-Marcel/cordless/ui/login"
-	"github.com/Bios-Marcel/cordless/version"
+	"github.com/Bios-Marcel/cordless/ui/updatedialog"
 )
 
 // StartApplication is the application's composition root. It sets up all known
 // windows, and handles all of the wiring between them.
 func StartApplication(windowManager windowman.WindowManagerInterface, accountToUse string) error {
+	configuration := config.Current
 	//App that will be reused throughout the process runtime.
 	tviewApp := windowManager.GetUnderlyingApp()
 
@@ -35,7 +37,21 @@ func StartApplication(windowManager windowman.WindowManagerInterface, accountToU
 	windowManager.RegisterWindow("root-screen", firstWindow)
 	windowManager.ShowWindow("root-screen")
 
+	configureUpdatesDialog(windowManager, *configuration)
+
 	return windowManager.Run()
+}
+
+func configureUpdatesDialog(windowManager windowman.WindowManagerInterface, configuration config.Config) {
+	updatesDialog := updatedialog.NewUpdateDialog(configuration)
+	updateChannel := version.CheckForUpdate(configuration.DontShowUpdateNotificationFor)
+	version.EmitVersionCheckingToMessageBus(windowManager.GetMessageBus(), updateChannel)
+
+	windowManager.GetMessageBus().Subscribe(version.MessageUpdateAvailable, func(available bool) {
+		if available {
+			windowManager.Dialog(&updatesDialog)
+		}
+	})
 }
 
 // SetupApplicationWithAccount launches the whole application and might
@@ -44,10 +60,6 @@ func StartApplication(windowManager windowman.WindowManagerInterface, accountToU
 // If the account can't be found, the login page will be shown.
 func SetupApplicationWithAccount(app *tview.Application, account string) windowman.Window {
 	configuration := config.Current
-
-	//We do this right after loading the configuration, as this might take
-	//longer than all following calls.
-	updateAvailableChannel := version.CheckForUpdate(configuration.DontShowUpdateNotificationFor)
 
 	configDir, configErr := config.GetConfigDirectory()
 	if configErr != nil {
@@ -81,35 +93,6 @@ func SetupApplicationWithAccount(app *tview.Application, account string) windowm
 		discord.State.MaxMessageCount = 100
 
 		readstate.Load(discord.State)
-
-		if isUpdateAvailable := <-updateAvailableChannel; isUpdateAvailable {
-			waitForUpdateDialogChannel := make(chan bool, 1)
-
-			dialog := tview.NewModal()
-			dialog.SetText(fmt.Sprintf("Version %s of cordless is available!\nYou are currently running version %s.\n\nUpdates have to be installed manually or via your package manager.\n\nThe snap package manager isn't supported by cordless anymore!", version.GetLatestRemoteVersion(), version.Version))
-			buttonOk := "Thanks for the info"
-			buttonDontRemindAgainForThisVersion := fmt.Sprintf("Skip reminders for %s", version.GetLatestRemoteVersion())
-			buttonNeverRemindMeAgain := "Never remind me again"
-			dialog.AddButtons([]string{buttonOk, buttonDontRemindAgainForThisVersion, buttonNeverRemindMeAgain})
-			dialog.SetDoneFunc(func(index int, label string) {
-				if label == buttonDontRemindAgainForThisVersion {
-					configuration.DontShowUpdateNotificationFor = version.GetLatestRemoteVersion()
-					config.PersistConfig()
-				} else if label == buttonNeverRemindMeAgain {
-					configuration.ShowUpdateNotifications = false
-					config.PersistConfig()
-				}
-
-				waitForUpdateDialogChannel <- true
-			})
-
-			app.QueueUpdateDraw(func() {
-				app.SetRoot(dialog, true)
-			})
-
-			<-waitForUpdateDialogChannel
-			close(waitForUpdateDialogChannel)
-		}
 
 		app.QueueUpdateDraw(func() {
 			window, createError := ui.NewWindow(app, discord, readyEvent)

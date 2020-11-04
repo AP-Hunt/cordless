@@ -3,12 +3,54 @@ package windowman_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	
+
 	"github.com/Bios-Marcel/cordless/windowman"
 	"github.com/Bios-Marcel/cordless/windowman/fakes"
 )
 
 var _ = Describe("WindowManager", func() {
+	Describe("Dialog", func() {
+		It("calls the Open method of the dialog", func() {
+			wm := windowman.NewWindowManager()
+			window := fakes.FakeWindow{}
+			dialog := fakes.FakeDialog{}
+
+			// Ensure the dialog closes by automatically closing it
+			dialog.OpenCalls(func(closer windowman.DialogCloser) error {
+				closer()
+				return nil
+			})
+
+			wm.RegisterWindow("root", &window)
+			wm.ShowWindow("root")
+
+			wm.Dialog(&dialog)
+			Expect(dialog.OpenCallCount()).To(Equal(1))
+		})
+
+		It("shows the previous window when the dialog has been closed", func() {
+			wm := windowman.NewWindowManager()
+			window := fakes.FakeWindow{}
+			dialog := fakes.FakeDialog{}
+			var dialogCloser windowman.DialogCloser
+
+			// Ensure the dialog closes by automatically closing it
+			dialog.OpenCalls(func(closer windowman.DialogCloser) error {
+				dialogCloser = closer
+				return nil
+			})
+
+			wm.RegisterWindow("root", &window)
+			wm.ShowWindow("root")
+
+			Expect(wm.GetVisibleWindow()).To(BeIdenticalTo(&window), "the root window was not visible before the dialog was shown")
+			wm.Dialog(&dialog)
+			Expect(wm.GetVisibleWindow()).To(BeIdenticalTo(&dialog), "the dialog was not the visible window whilst it was open")
+			dialogCloser()
+			Expect(wm.GetVisibleWindow()).To(BeIdenticalTo(&window), "the root window was not visible after the dialog was closed")
+		})
+	})
+
 	Describe("RegisterWindow", func() {
 		It("returns an error if an identifier has already been used", func() {
 			wm := windowman.NewWindowManager()
@@ -50,7 +92,7 @@ var _ = Describe("WindowManager", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("shows a registered window", func(){
+		It("shows a registered window", func() {
 			wm := windowman.NewWindowManager()
 			window := fakes.FakeWindow{}
 
@@ -63,7 +105,7 @@ var _ = Describe("WindowManager", func() {
 			Expect(shownWindow).To(BeIdenticalTo(&window))
 		})
 
-		It("calls the 'Show' method of the window", func(){
+		It("calls the 'Show' method of the window", func() {
 			wm := windowman.NewWindowManager()
 			window := fakes.FakeWindow{}
 

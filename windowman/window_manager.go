@@ -40,9 +40,10 @@ type ApplicationControl interface {
 type WindowManager struct {
 	tviewApp *tview.Application
 
-	windowRegistry map[string]Window
-	visibleWindow  Window
-	messages       messagebus.MessageBus
+	windowRegistry          map[string]Window
+	visibleWindow           Window
+	visibleWindowIdentifier string
+	messages                messagebus.MessageBus
 }
 
 func GetWindowManager() WindowManagerInterface {
@@ -89,14 +90,19 @@ func (wm *WindowManager) GetUnderlyingApp() *tview.Application {
 
 func (wm *WindowManager) ShowWindow(identifier string) error {
 	if w, exists := wm.windowRegistry[identifier]; exists {
-		return wm.makeWindowVisible(w)
+		return wm.makeWindowVisible(identifier, w)
 	} else {
 		return fmt.Errorf("'%s' is not a registered window", identifier)
 	}
 }
 
 func (wm *WindowManager) Dialog(dialog Dialog) error {
-	panic("not implemented")
+	originalWindowId := wm.visibleWindowIdentifier
+	closer := func() error {
+		return wm.ShowWindow(originalWindowId)
+	}
+	wm.makeWindowVisible("current-dialog", dialog)
+	return dialog.Open(closer)
 }
 
 func (wm *WindowManager) RegisterWindow(identifier string, window Window) error {
@@ -131,7 +137,7 @@ func (wm *WindowManager) exitApplicationEventHandler(event *tcell.EventKey) *tce
 	return event
 }
 
-func (wm *WindowManager) makeWindowVisible(window Window) error {
+func (wm *WindowManager) makeWindowVisible(identifier string, window Window) error {
 	err := window.Show(wm.tviewApp)
 
 	if err != nil {
@@ -147,6 +153,7 @@ func (wm *WindowManager) makeWindowVisible(window Window) error {
 
 	wm.tviewApp.SetInputCapture(passThroughHandler)
 	wm.visibleWindow = window
+	wm.visibleWindowIdentifier = identifier
 	return nil
 }
 
