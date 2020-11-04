@@ -157,6 +157,8 @@ func (sw *ShortcutWindow) HandleKeyEvent(event *tcell.EventKey) *tcell.EventKey 
 	})
 }
 
+func (sw *ShortcutWindow) OnRegister() {}
+
 func NewShortcutWindow() *ShortcutWindow {
 	shortcutWindow := &ShortcutWindow{}
 	//FIXME Shortcuts view doesn't close on ESC anymore, this needs to be solved.

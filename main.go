@@ -62,7 +62,9 @@ func main() {
 	if showShortcutsDialog != nil && *showShortcutsDialog {
 		wm := windowman.GetWindowManager()
 		shortcutWindow := shortcutdialog.NewShortcutWindow()
-		wmError := wm.Run(shortcutWindow)
+		wm.RegisterWindow("shortcut-window", shortcutWindow)
+		wm.ShowWindow("shortcut-window")
+		wmError := wm.Run()
 		if wmError != nil {
 			panic(wmError)
 		}
@@ -82,7 +84,10 @@ func main() {
 			firstWindow = app.SetupApplication(tviewApp)
 		}
 
-		runError := windowman.GetWindowManager().Run(firstWindow)
+		windowManager.RegisterWindow("root-screen", firstWindow)
+		windowManager.ShowWindow("root-screen")
+
+		runError := windowManager.Run()
 		if runError != nil {
 			log.Fatalf("Error launching View (%v).\n", runError)
 		}

@@ -3,21 +3,25 @@ package windowman
 import (
 	tcell "github.com/gdamore/tcell/v2"
 
+	"fmt"
+
 	"github.com/Bios-Marcel/cordless/config"
 	"github.com/Bios-Marcel/cordless/shortcuts"
 	"github.com/Bios-Marcel/cordless/tview"
 )
 
 var (
-	windowManagerSingleton WindowManager = nil
+	windowManagerSingleton WindowManagerInterface = nil
 )
 
 type EventHandler func(*tcell.EventKey) *tcell.EventKey
 
-type WindowManager interface {
-	Show(window Window) error
+type WindowManagerInterface interface {
+	GetVisibleWindow() Window
+	ShowWindow(identifier string) error
 	Dialog(dialog Dialog) error
-	Run(window Window) error
+	RegisterWindow(identifier string, window Window) error
+	Run() error
 
 	// FIXME Temporary solution.
 	GetUnderlyingApp() *tview.Application
@@ -31,26 +35,35 @@ type ApplicationControl interface {
 	QueueUpdateDraw(f func()) *tview.Application
 }
 
-type concreteWindowManager struct {
+type WindowManager struct {
 	tviewApp *tview.Application
+
+	windowRegistry map[string]Window
+	visibleWindow  Window
 }
 
-func GetWindowManager() WindowManager {
+func GetWindowManager() WindowManagerInterface {
 	if windowManagerSingleton == nil {
-		windowManagerSingleton = newWindowManager()
+		windowManagerSingleton = NewWindowManager()
 	}
 
 	return windowManagerSingleton
 }
 
-func newWindowManager() WindowManager {
-	wm := &concreteWindowManager{
-		tviewApp: tview.NewApplication(),
+func NewWindowManager() WindowManagerInterface {
+	return NewWindowManagerWithTViewApp(tview.NewApplication())
+}
+
+func NewWindowManagerWithTViewApp(app *tview.Application) WindowManagerInterface {
+	wm := &WindowManager{
+		tviewApp:       app,
+		windowRegistry: make(map[string]Window),
+		visibleWindow:  nil,
 	}
 
 	wm.tviewApp.MouseEnabled = config.Current.MouseEnabled
 
-	// WindowManager sets the root input handler.
+	// WindowManagerInterface sets the root input handler.
 	// It captures exit application shortcuts, and exits the application,
 	// or otherwise allows the event to bubble down.
 	wm.tviewApp.SetInputCapture(wm.exitApplicationEventHandler)
@@ -58,7 +71,51 @@ func newWindowManager() WindowManager {
 	return wm
 }
 
-func (wm *concreteWindowManager) exitApplicationEventHandler(event *tcell.EventKey) *tcell.EventKey {
+func (wm *WindowManager) GetVisibleWindow() Window {
+	return wm.visibleWindow
+}
+
+func (wm *WindowManager) GetUnderlyingApp() *tview.Application {
+	return wm.tviewApp
+}
+
+func (wm *WindowManager) ShowWindow(identifier string) error {
+	if w, exists := wm.windowRegistry[identifier]; exists {
+		return wm.makeWindowVisible(w)
+	} else {
+		return fmt.Errorf("'%s' is not a registered window", identifier)
+	}
+}
+
+func (wm *WindowManager) Dialog(dialog Dialog) error {
+	panic("not implemented")
+}
+
+func (wm *WindowManager) RegisterWindow(identifier string, window Window) error {
+	if _, exists := wm.windowRegistry[identifier]; exists {
+		return fmt.Errorf("another window is already registered under the name '%s'", identifier)
+	} else {
+		wm.windowRegistry[identifier] = window
+		window.OnRegister()
+		return nil
+	}
+}
+
+func (wm *WindowManager) Run() error {
+	if wm.visibleWindow == nil {
+		return fmt.Errorf("no window has been made visible before running the application")
+	}
+	return wm.tviewApp.Run()
+}
+
+func createSetFocusCallback(app *tview.Application) func(tview.Primitive) error {
+	return func(primitive tview.Primitive) error {
+		app.SetFocus(primitive)
+		return nil
+	}
+}
+
+func (wm *WindowManager) exitApplicationEventHandler(event *tcell.EventKey) *tcell.EventKey {
 	if shortcuts.ExitApplication.Equals(event) {
 		wm.tviewApp.Stop()
 		return nil
@@ -66,23 +123,7 @@ func (wm *concreteWindowManager) exitApplicationEventHandler(event *tcell.EventK
 	return event
 }
 
-func (wm *concreteWindowManager) GetUnderlyingApp() *tview.Application {
-	return wm.tviewApp
-}
-
-func stackEventHandler(root EventHandler, new EventHandler) EventHandler {
-	return func(event *tcell.EventKey) *tcell.EventKey {
-		rootEvt := root(event)
-
-		if rootEvt == nil {
-			return nil
-		}
-
-		return new(rootEvt)
-	}
-}
-
-func (wm *concreteWindowManager) Show(window Window) error {
+func (wm *WindowManager) makeWindowVisible(window Window) error {
 	err := window.Show(wm.tviewApp)
 
 	if err != nil {
@@ -97,25 +138,18 @@ func (wm *concreteWindowManager) Show(window Window) error {
 	)
 
 	wm.tviewApp.SetInputCapture(passThroughHandler)
+	wm.visibleWindow = window
 	return nil
 }
 
-func (wm *concreteWindowManager) Dialog(dialog Dialog) error {
-	panic("not implemented")
-}
+func stackEventHandler(root EventHandler, new EventHandler) EventHandler {
+	return func(event *tcell.EventKey) *tcell.EventKey {
+		rootEvt := root(event)
 
-func (wm *concreteWindowManager) Run(window Window) error {
-	err := wm.Show(window)
-	if err != nil {
-		return err
-	}
+		if rootEvt == nil {
+			return nil
+		}
 
-	return wm.tviewApp.Run()
-}
-
-func createSetFocusCallback(app *tview.Application) func(tview.Primitive) error {
-	return func(primitive tview.Primitive) error {
-		app.SetFocus(primitive)
-		return nil
+		return new(rootEvt)
 	}
 }

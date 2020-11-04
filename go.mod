@@ -14,7 +14,10 @@ require (
 	github.com/google/go-github/v29 v29.0.3
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mattn/go-runewidth v0.0.9
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.3.0 // indirect
 	github.com/mdp/qrterminal/v3 v3.0.0
+	github.com/onsi/ginkgo v1.14.2
+	github.com/onsi/gomega v1.10.3
 	github.com/pkg/errors v0.9.1
 	github.com/rivo/uniseg v0.1.0
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac

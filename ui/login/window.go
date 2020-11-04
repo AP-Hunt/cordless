@@ -28,3 +28,5 @@ func (lw *LoginWindow) Show(appCtl windowman.ApplicationControl) error {
 func (lw *LoginWindow) HandleKeyEvent(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
+
+func (lw *LoginWindow) OnRegister() {}
