@@ -19,6 +19,25 @@ import (
 	"github.com/Bios-Marcel/cordless/version"
 )
 
+// StartApplication is the application's composition root. It sets up all known
+// windows, and handles all of the wiring between them.
+func StartApplication(windowManager windowman.WindowManagerInterface, accountToUse string) error {
+	//App that will be reused throughout the process runtime.
+	tviewApp := windowManager.GetUnderlyingApp()
+
+	var firstWindow windowman.Window
+	if accountToUse != "" {
+		firstWindow = SetupApplicationWithAccount(tviewApp, accountToUse)
+	} else {
+		firstWindow = SetupApplication(tviewApp)
+	}
+
+	windowManager.RegisterWindow("root-screen", firstWindow)
+	windowManager.ShowWindow("root-screen")
+
+	return windowManager.Run()
+}
+
 // SetupApplicationWithAccount launches the whole application and might
 // abort in case it encounters an error. The login will attempt
 // using the account specified, unless the argument is empty.

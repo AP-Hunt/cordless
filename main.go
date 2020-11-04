@@ -74,20 +74,12 @@ func main() {
 		fmt.Println("You've started up using the prototype UI. There's nothing to see here yet.")
 	} else {
 		windowManager := windowman.GetWindowManager()
-		//App that will be reused throughout the process runtime.
-		tviewApp := windowManager.GetUnderlyingApp()
-
-		var firstWindow windowman.Window
+		account := ""
 		if accountToUse != nil && *accountToUse != "" {
-			firstWindow = app.SetupApplicationWithAccount(tviewApp, *accountToUse)
-		} else {
-			firstWindow = app.SetupApplication(tviewApp)
+			account = *accountToUse
 		}
 
-		windowManager.RegisterWindow("root-screen", firstWindow)
-		windowManager.ShowWindow("root-screen")
-
-		runError := windowManager.Run()
+		runError := app.StartApplication(windowManager, account)
 		if runError != nil {
 			log.Fatalf("Error launching View (%v).\n", runError)
 		}
