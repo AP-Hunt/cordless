@@ -2,6 +2,7 @@ package shortcutdialog
 
 import (
 	tcell "github.com/gdamore/tcell/v2"
+	messagebus "github.com/vardius/message-bus"
 
 	"github.com/Bios-Marcel/cordless/shortcuts"
 	"github.com/Bios-Marcel/cordless/tview"
@@ -157,7 +158,7 @@ func (sw *ShortcutWindow) HandleKeyEvent(event *tcell.EventKey) *tcell.EventKey 
 	})
 }
 
-func (sw *ShortcutWindow) OnRegister() {}
+func (sw *ShortcutWindow) OnRegister(messages messagebus.MessageBus) {}
 
 func NewShortcutWindow() *ShortcutWindow {
 	shortcutWindow := &ShortcutWindow{}

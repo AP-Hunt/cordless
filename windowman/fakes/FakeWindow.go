@@ -6,6 +6,7 @@ import (
 
 	"github.com/Bios-Marcel/cordless/windowman"
 	tcell "github.com/gdamore/tcell/v2"
+	messagebus "github.com/vardius/message-bus"
 )
 
 type FakeWindow struct {
@@ -20,9 +21,10 @@ type FakeWindow struct {
 	handleKeyEventReturnsOnCall map[int]struct {
 		result1 *tcell.EventKey
 	}
-	OnRegisterStub        func()
+	OnRegisterStub        func(messagebus.MessageBus)
 	onRegisterMutex       sync.RWMutex
 	onRegisterArgsForCall []struct {
+		arg1 messagebus.MessageBus
 	}
 	ShowStub        func(windowman.ApplicationControl) error
 	showMutex       sync.RWMutex
@@ -100,15 +102,16 @@ func (fake *FakeWindow) HandleKeyEventReturnsOnCall(i int, result1 *tcell.EventK
 	}{result1}
 }
 
-func (fake *FakeWindow) OnRegister() {
+func (fake *FakeWindow) OnRegister(arg1 messagebus.MessageBus) {
 	fake.onRegisterMutex.Lock()
 	fake.onRegisterArgsForCall = append(fake.onRegisterArgsForCall, struct {
-	}{})
+		arg1 messagebus.MessageBus
+	}{arg1})
 	stub := fake.OnRegisterStub
-	fake.recordInvocation("OnRegister", []interface{}{})
+	fake.recordInvocation("OnRegister", []interface{}{arg1})
 	fake.onRegisterMutex.Unlock()
 	if stub != nil {
-		fake.OnRegisterStub()
+		fake.OnRegisterStub(arg1)
 	}
 }
 
@@ -118,10 +121,17 @@ func (fake *FakeWindow) OnRegisterCallCount() int {
 	return len(fake.onRegisterArgsForCall)
 }
 
-func (fake *FakeWindow) OnRegisterCalls(stub func()) {
+func (fake *FakeWindow) OnRegisterCalls(stub func(messagebus.MessageBus)) {
 	fake.onRegisterMutex.Lock()
 	defer fake.onRegisterMutex.Unlock()
 	fake.OnRegisterStub = stub
+}
+
+func (fake *FakeWindow) OnRegisterArgsForCall(i int) messagebus.MessageBus {
+	fake.onRegisterMutex.RLock()
+	defer fake.onRegisterMutex.RUnlock()
+	argsForCall := fake.onRegisterArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *FakeWindow) Show(arg1 windowman.ApplicationControl) error {

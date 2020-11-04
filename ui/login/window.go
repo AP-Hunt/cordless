@@ -3,6 +3,7 @@ package login
 import (
 	"github.com/Bios-Marcel/cordless/windowman"
 	tcell "github.com/gdamore/tcell/v2"
+	messagebus "github.com/vardius/message-bus"
 )
 
 type LoginWindow struct {
@@ -29,4 +30,4 @@ func (lw *LoginWindow) HandleKeyEvent(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
-func (lw *LoginWindow) OnRegister() {}
+func (lw *LoginWindow) OnRegister(messages messagebus.MessageBus) {}

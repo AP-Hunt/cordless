@@ -8,6 +8,7 @@ import (
 	"github.com/Bios-Marcel/cordless/config"
 	"github.com/Bios-Marcel/cordless/shortcuts"
 	"github.com/Bios-Marcel/cordless/tview"
+	messagebus "github.com/vardius/message-bus"
 )
 
 var (
@@ -17,9 +18,10 @@ var (
 type EventHandler func(*tcell.EventKey) *tcell.EventKey
 
 type WindowManagerInterface interface {
+	GetMessageBus() messagebus.MessageBus
 	GetVisibleWindow() Window
-	ShowWindow(identifier string) error
 	Dialog(dialog Dialog) error
+	ShowWindow(identifier string) error
 	RegisterWindow(identifier string, window Window) error
 	Run() error
 
@@ -40,6 +42,7 @@ type WindowManager struct {
 
 	windowRegistry map[string]Window
 	visibleWindow  Window
+	messages       messagebus.MessageBus
 }
 
 func GetWindowManager() WindowManagerInterface {
@@ -59,6 +62,7 @@ func NewWindowManagerWithTViewApp(app *tview.Application) WindowManagerInterface
 		tviewApp:       app,
 		windowRegistry: make(map[string]Window),
 		visibleWindow:  nil,
+		messages:       messagebus.New(100),
 	}
 
 	wm.tviewApp.MouseEnabled = config.Current.MouseEnabled
@@ -69,6 +73,10 @@ func NewWindowManagerWithTViewApp(app *tview.Application) WindowManagerInterface
 	wm.tviewApp.SetInputCapture(wm.exitApplicationEventHandler)
 
 	return wm
+}
+
+func (wm *WindowManager) GetMessageBus() messagebus.MessageBus {
+	return wm.messages
 }
 
 func (wm *WindowManager) GetVisibleWindow() Window {
@@ -96,7 +104,7 @@ func (wm *WindowManager) RegisterWindow(identifier string, window Window) error 
 		return fmt.Errorf("another window is already registered under the name '%s'", identifier)
 	} else {
 		wm.windowRegistry[identifier] = window
-		window.OnRegister()
+		window.OnRegister(wm.messages)
 		return nil
 	}
 }

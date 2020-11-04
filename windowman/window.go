@@ -2,6 +2,7 @@ package windowman
 
 import (
 	tcell "github.com/gdamore/tcell/v2"
+	messagebus "github.com/vardius/message-bus"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -13,6 +14,8 @@ type Window interface {
 	Show(ApplicationControl) error
 	HandleKeyEvent(*tcell.EventKey) *tcell.EventKey
 
-	// OnRegister is called when the window is registered in a window manager
-	OnRegister()
+	// OnRegister is called when the window is registered in a window manager.
+	// The messages parameter allows the window to subscribe to messages on the message bus,
+	// or to publish its own
+	OnRegister(messages messagebus.MessageBus)
 }
