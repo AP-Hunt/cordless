@@ -3,6 +3,7 @@ package login
 import (
 	"errors"
 
+	"github.com/Bios-Marcel/cordless/authentication"
 	"github.com/Bios-Marcel/cordless/tview"
 	"github.com/Bios-Marcel/cordless/windowman"
 	"github.com/Bios-Marcel/discordgo"
@@ -39,6 +40,7 @@ type Login struct {
 	passwordInput      *tview.InputField
 	tfaTokenInput      *tview.InputField
 	loginType          LoginType
+	authenticator      authentication.Authenticator
 
 	loginTypeTokenButton    *tview.Button
 	loginTypePasswordButton *tview.Button
@@ -49,6 +51,8 @@ type Login struct {
 	loginChoiceView   tview.Primitive
 	passwordInputView tview.Primitive
 	tokenInputView    tview.Primitive
+
+	onLoginSuccessCallback func(session discordgo.Session, ready discordgo.Ready)
 }
 
 type loginAttempt struct {
@@ -57,7 +61,7 @@ type loginAttempt struct {
 }
 
 // NewLogin creates a new login screen with the login components hidden by default.
-func NewLogin(configDir string) *Login {
+func NewLogin(configDir string, authenticator authentication.Authenticator) *Login {
 	login := &Login{
 		Flex:                    tview.NewFlex().SetDirection(tview.FlexRow),
 		appCtl:                  nil,
@@ -72,6 +76,7 @@ func NewLogin(configDir string) *Login {
 		loginTypeTokenButton:    tview.NewButton("Login via Authentication-Token"),
 		loginTypePasswordButton: tview.NewButton("Login via E-Mail and password (Optionally Supports 2FA)"),
 		messageText:             tview.NewTextView(),
+		authenticator:           authenticator,
 	}
 
 	splashScreen := tview.NewTextView()
@@ -253,8 +258,9 @@ func (login *Login) attemptLogin() {
 	case None:
 		panic("Was in state loginType=None during login attempt.")
 	case Token:
-		session, loginError := discordgo.NewWithToken(login.tokenInput.GetText())
+		session, ready, loginError := login.authenticator.AuthenticateWithToken(login.tokenInput.GetText())
 		login.sessionChannel <- &loginAttempt{session, loginError}
+		login.invokeLoginSucess(session, ready)
 	case Password:
 		// Even if the login is supposed to be without two-factor-authentication, we
 		// attempt parsing a 2fa code, since the underlying rest-call can also handle
@@ -269,8 +275,9 @@ func (login *Login) attemptLogin() {
 			}
 		}
 
-		session, loginError := discordgo.NewWithPasswordAndMFA(login.usernameInput.GetText(), login.passwordInput.GetText(), mfaTokenText)
+		session, ready, loginError := login.authenticator.AuthenicateWithCredentials(login.usernameInput.GetText(), login.passwordInput.GetText(), mfaTokenText)
 		login.sessionChannel <- &loginAttempt{session, loginError}
+		login.invokeLoginSucess(session, ready)
 	}
 
 }
@@ -325,4 +332,14 @@ func (login *Login) showView(view tview.Primitive, size int) {
 
 func (login *Login) SetAppControl(appCtl windowman.ApplicationControl) {
 	login.appCtl = appCtl
+}
+
+func (login *Login) OnLoginSuccess(callback func(session discordgo.Session, ready discordgo.Ready)) {
+	login.onLoginSuccessCallback = callback
+}
+
+func (login *Login) invokeLoginSucess(session discordgo.Session, ready discordgo.Ready) {
+	if login.onLoginSuccessCallback != nil {
+		login.onLoginSuccessCallback(session, ready)
+	}
 }

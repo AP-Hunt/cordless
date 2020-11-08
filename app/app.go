@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Bios-Marcel/cordless/authentication"
+	"github.com/Bios-Marcel/cordless/messagebus"
 	"github.com/Bios-Marcel/cordless/tview"
 	"github.com/Bios-Marcel/cordless/version"
 	"github.com/Bios-Marcel/cordless/windowman"
@@ -27,17 +29,48 @@ func StartApplication(windowManager windowman.WindowManagerInterface, accountToU
 	//App that will be reused throughout the process runtime.
 	tviewApp := windowManager.GetUnderlyingApp()
 
-	var firstWindow windowman.Window
-	if accountToUse != "" {
-		firstWindow = SetupApplicationWithAccount(tviewApp, accountToUse)
-	} else {
-		firstWindow = SetupApplication(tviewApp)
+	configDir, configErr := config.GetConfigDirectory()
+	if configErr != nil {
+		log.Fatalf("Unable to determine configuration directory (%s)\n", configErr.Error())
 	}
 
-	windowManager.RegisterWindow("root-screen", firstWindow)
-	windowManager.ShowWindow("root-screen")
+	if accountToUse != nil && strings.TrimSpace(accountToUse) != "" {
+		configuration.Token = configuration.GetAccountToken(account)
+	}
+
+	authenticator := authentication.Authenticator{}
+
+	loginWindow := login.NewLoginWindow(configDir, authenticator)
+	windowManager.RegisterWindow("login", &loginWindow)
+
+	sess, ready, err := authenticator.AuthenticateFromLastSession(configuration, &accountToUse)
+	if err != nil {
+		log.Fatalf("Something went wrong trying to authenticate from the last session: %s", err)
+	}
+
+	// Can't auth from last session
+	if sess == nil {
+		windowManager.GetMessageBus().Subscribe(messagebus.TopicDiscordLoginSuccess, func(sess discordgo.Session, ready discordgo.Ready) {
+			panic("I need to start up the message publishing for discord events and then show the main window")
+			windowManager.ShowWindow("main-screen")
+		})
+		windowManager.ShowWindow("login")
+
+		var firstWindow windowman.Window
+		if accountToUse != "" {
+			firstWindow = SetupApplicationWithAccount(tviewApp, accountToUse)
+		} else {
+			firstWindow = SetupApplication(tviewApp)
+		}
+
+		windowManager.RegisterWindow("root-screen", firstWindow)
+		windowManager.ShowWindow("root-screen")
+	} else {
+		panic("I need to show the main window here")
+	}
 
 	configureUpdatesDialog(windowManager, *configuration)
+	configureConfigMessageHandling(windowManager.GetMessageBus(), *configuration)
 
 	return windowManager.Run()
 }
@@ -54,6 +87,14 @@ func configureUpdatesDialog(windowManager windowman.WindowManagerInterface, conf
 	})
 }
 
+//configureConfigMessageHandling subscribes to events that result in config changes
+func configureConfigMessageHandling(messageBus messagebus.MessageBus, configuration config.Config) {
+	messageBus.Subscribe(messagebus.TopicDiscordLoginSuccess, func(sess discordgo.Session, ready discordgo.Ready) {
+		configuration.Token = sess.Token
+		config.PersistConfig()
+	})
+}
+
 // SetupApplicationWithAccount launches the whole application and might
 // abort in case it encounters an error. The login will attempt
 // using the account specified, unless the argument is empty.
@@ -66,21 +107,11 @@ func SetupApplicationWithAccount(app *tview.Application, account string) windowm
 		log.Fatalf("Unable to determine configuration directory (%s)\n", configErr.Error())
 	}
 
-	loginWindow := login.NewLoginWindow(configDir)
-	loginScreen := loginWindow.LoginWindowComponent
-
-	if strings.TrimSpace(account) != "" {
-		configuration.Token = configuration.GetAccountToken(account)
-	}
-
 	go func() {
 		shortcutsLoadError := shortcuts.Load()
 		if shortcutsLoadError != nil {
 			panic(shortcutsLoadError)
 		}
-		log.Println("attempting login")
-		discord, readyEvent := attemptLogin(loginScreen, "", configuration)
-		log.Println("attempted login")
 
 		config.Current.Token = discord.Token
 

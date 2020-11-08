@@ -1,7 +1,9 @@
 package login
 
 import (
+	"github.com/Bios-Marcel/cordless/authentication"
 	"github.com/Bios-Marcel/cordless/windowman"
+	"github.com/Bios-Marcel/discordgo"
 	tcell "github.com/gdamore/tcell/v2"
 	messagebus "github.com/vardius/message-bus"
 )
@@ -12,9 +14,9 @@ type LoginWindow struct {
 	LoginWindowComponent *Login
 }
 
-func NewLoginWindow(configDirectory string) LoginWindow {
+func NewLoginWindow(configDirectory string, authenticator authentication.Authenticator) LoginWindow {
 	return LoginWindow{
-		LoginWindowComponent: NewLogin(configDirectory),
+		LoginWindowComponent: NewLogin(configDirectory, authenticator),
 	}
 }
 
@@ -30,4 +32,11 @@ func (lw *LoginWindow) HandleKeyEvent(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
-func (lw *LoginWindow) OnRegister(messages messagebus.MessageBus) {}
+func (lw *LoginWindow) OnRegister(messages messagebus.MessageBus) {
+
+	// Publish a login success message when the underlying component calls back to
+	// say that authentication was successful
+	lw.LoginWindowComponent.OnLoginSuccess(func(session discordgo.Session, ready discordgo.Ready) {
+		messages.Publish(messagebus.TopicDiscordLoginSuccess, session, ready)
+	})
+}
