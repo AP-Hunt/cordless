@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/Bios-Marcel/cordless/config"
+	"github.com/Bios-Marcel/cordless/messagebus"
 	"github.com/Bios-Marcel/cordless/shortcuts"
 	"github.com/Bios-Marcel/cordless/tview"
-	messagebus "github.com/vardius/message-bus"
 )
 
 var (
@@ -63,7 +63,7 @@ func NewWindowManagerWithTViewApp(app *tview.Application) WindowManagerInterface
 		tviewApp:       app,
 		windowRegistry: make(map[string]Window),
 		visibleWindow:  nil,
-		messages:       messagebus.New(100),
+		messages:       messagebus.NewMessageBus(),
 	}
 
 	wm.tviewApp.MouseEnabled = config.Current.MouseEnabled

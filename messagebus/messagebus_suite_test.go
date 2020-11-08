@@ -1,0 +1,13 @@
+package messagebus_test
+
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+func TestMessagebus(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Messagebus Suite")
+}
